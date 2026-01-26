@@ -1,4 +1,4 @@
--- AutoInstanceLog.lua (v2.1) - simplified per your preferences
+-- AutoInstanceLog.lua (v2.2) - adds a scrollable Options panel
 
 local ADDON_NAME = ...
 local f = CreateFrame("Frame")
@@ -32,9 +32,6 @@ local DEFAULTS = {
 
   -- Settings scope selector stored in ACCOUNT DB only
   perCharacter = false,
-
-  -- Participation is always per-character (Char DB)
-  -- charDB.participate = true (see CHAR_DEFAULTS)
 
   -- Level gating (only max level or not)
   onlyMaxLevel = false,
@@ -365,10 +362,10 @@ end
 -- ============================================================
 local function ResetLoggingForNewInstance(db, shouldLogDestination)
   if not db.resetOnInstanceSwap then
-    -- No boundary reset; just ensure correct state
     EstablishOwnershipOnEntry(db)
     if shouldLogDestination and (not STATE.manualOwnedLogging) then
       EnableCombatLogging(db, true)
+      ScheduleRecheck()
     end
     return
   end
@@ -377,7 +374,6 @@ local function ResetLoggingForNewInstance(db, shouldLogDestination)
   local ownsOrStrict = (STATE.addonEnabledLogging == true) or (db.disableOnLeaveAnyIfEnabled == true)
   if db.respectManualLogging and LoggingCombat() and (not ownsOrStrict) then
     EstablishOwnershipOnEntry(db)
-    -- manual owned; do not force a boundary reset
     return
   end
 
@@ -613,13 +609,7 @@ local function DryRunReport(source)
     if shouldLogHere then
       action = loggingNow and "No action (already logging / manual-owned possible)" or "Would enable logging"
     else
-      if db.disableOnLeaveAnyIfEnabled and sigPrev and sigPrev ~= "world" and sigNow == "world" and loggingNow then
-        action = "Would disable logging quietly (leave-any)"
-      elseif db.disableWhenLeavingLogged and STATE.addonEnabledLogging and (not STATE.manualOwnedLogging) and loggingNow then
-        action = "Would disable logging (addon-owned)"
-      else
-        action = "No action"
-      end
+      action = "No action"
     end
   end
 
@@ -720,11 +710,7 @@ SlashCmdList["AUTOINSTANCELOG"] = function(input)
   local charDB = GetCharDB()
   input = trim((input or ""):lower())
 
-  if input == "" or input == "help" then
-    ShowHelp()
-    return
-  end
-
+  if input == "" or input == "help" then ShowHelp(); return end
   if input == "status" then ShowStatus(); return end
   if input == "debug" then ShowDebug(); return end
   if input == "test" then DryRunReport("slash"); return end
@@ -881,7 +867,7 @@ SlashCmdList["AUTOINSTANCELOG"] = function(input)
 end
 
 -- ============================================================
--- Options panel (legacy controls; reliable)
+-- Options panel (SCROLLING)
 -- ============================================================
 local function CreateOptionsPanel()
   if not Settings or not Settings.RegisterCanvasLayoutCategory then
@@ -893,18 +879,51 @@ local function CreateOptionsPanel()
   local panel = CreateFrame("Frame")
   panel.name = "Auto Instance Log"
 
-  local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-  title:SetPoint("TOPLEFT", 16, -16)
-  title:SetText("Auto Instance Log")
+  -- Scroll frame wrapper (THIS FIXES "runs off the page")
+  local scrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+  scrollFrame:SetPoint("TOPLEFT", 0, -4)
+  scrollFrame:SetPoint("BOTTOMRIGHT", -27, 4)
+  scrollFrame:EnableMouseWheel(true)
+  scrollFrame:SetScript("OnMouseWheel", function(self, delta)
+    local step = 40
+    local cur = self:GetVerticalScroll()
+    self:SetVerticalScroll(cur - delta * step)
+  end)
 
-  local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-  subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-  subtitle:SetText("Auto-enable combat logging in dungeons/raids with M+ and raid difficulty filters.")
+  -- Content frame: all widgets parent to this
+  local content = CreateFrame("Frame", nil, scrollFrame)
+  content:SetSize(1, 1)
+  scrollFrame:SetScrollChild(content)
 
-  local y = -60
+  -- Helper: keep content width in sync so anchors behave
+  panel:SetScript("OnShow", function()
+    local w = scrollFrame:GetWidth()
+    if w and w > 1 then
+      content:SetWidth(w)
+    end
+  end)
+
+  local y = -16
+
+  local function AddTitle(text)
+    local t = content:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    t:SetPoint("TOPLEFT", 16, y)
+    t:SetText(text)
+    y = y - 28
+    return t
+  end
+
+  local function AddSub(text)
+    local s = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    s:SetPoint("TOPLEFT", 16, y)
+    s:SetJustifyH("LEFT")
+    s:SetText(text)
+    y = y - 28
+    return s
+  end
 
   local function AddCheck(label, tip, getf, setf)
-    local cb = CreateFrame("CheckButton", nil, panel, "InterfaceOptionsCheckButtonTemplate")
+    local cb = CreateFrame("CheckButton", nil, content, "InterfaceOptionsCheckButtonTemplate")
     cb:SetPoint("TOPLEFT", 16, y)
     cb.Text:SetText(label)
     cb.tooltipText = tip
@@ -918,11 +937,11 @@ local function CreateOptionsPanel()
   end
 
   local function AddDropdown(labelText, values, getf, setf)
-    local label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    local label = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     label:SetPoint("TOPLEFT", 16, y)
     label:SetText(labelText)
 
-    local dd = CreateFrame("Frame", nil, panel, "UIDropDownMenuTemplate")
+    local dd = CreateFrame("Frame", nil, content, "UIDropDownMenuTemplate")
     dd:SetPoint("TOPLEFT", label, "BOTTOMLEFT", -16, -6)
 
     local function SetValue(v)
@@ -949,8 +968,20 @@ local function CreateOptionsPanel()
     return dd
   end
 
+  local function AddButton(text, x, yOffset, onClick)
+    local b = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+    b:SetSize(140, 22)
+    b:SetPoint("TOPLEFT", x, yOffset)
+    b:SetText(text)
+    b:SetScript("OnClick", onClick)
+    return b
+  end
+
   local function DB() return GetDB() end
   local function CDB() return GetCharDB() end
+
+  AddTitle("Auto Instance Log")
+  AddSub("Auto-enable combat logging in dungeons/raids with Mythic+ and raid difficulty filters. This panel scrolls.")
 
   AddCheck("Enabled", "Master enable for addon behavior.", function() return DB().enabled end, function(v) DB().enabled = v end)
   AddCheck("Enable for this character (participate)", "If off, this character will never be auto-logged.", function() return CDB().participate end, function(v) CDB().participate = v end)
@@ -965,7 +996,7 @@ local function CreateOptionsPanel()
   AddCheck("Max level only", "Only enable logging at current max level.", function() return DB().onlyMaxLevel end, function(v) DB().onlyMaxLevel = v end)
   AddCheck("Mythic+ only (dungeons)", "Only enable logging in M+ keystone dungeons.", function() return DB().mythicPlusOnly end, function(v) DB().mythicPlusOnly = v end)
 
-  local raidHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+  local raidHeader = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
   raidHeader:SetPoint("TOPLEFT", 16, y)
   raidHeader:SetText("Raid difficulties to log:")
   y = y - 24
@@ -983,16 +1014,7 @@ local function CreateOptionsPanel()
   AddCheck("Enable Advanced Combat Logging", "Sets AdvancedCombatLogging=1 when enabling logging.", function() return DB().advancedCombatLogging end, function(v) DB().advancedCombatLogging = v end)
 
   -- Buttons row
-  local function AddButton(text, x, yOffset, onClick)
-    local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    b:SetSize(140, 22)
-    b:SetPoint("TOPLEFT", x, yOffset)
-    b:SetText(text)
-    b:SetScript("OnClick", onClick)
-    return b
-  end
-
-  local buttonsY = y - 10
+  local buttonsY = y - 8
   AddButton("Test (dry run)", 16, buttonsY, function() DryRunReport("options") end)
   AddButton("Export", 166, buttonsY, function()
     local s = SerializeDB()
@@ -1000,31 +1022,38 @@ local function CreateOptionsPanel()
     StaticPopup_Show("AUTOINSTANCELOG_EXPORT", nil, nil, s)
   end)
   AddButton("Import", 316, buttonsY, function() StaticPopup_Show("AUTOINSTANCELOG_IMPORT") end)
+  y = buttonsY - 36
 
-  local syncLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-  syncLabel:SetPoint("TOPLEFT", 16, buttonsY - 36)
+  local syncLabel = content:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+  syncLabel:SetPoint("TOPLEFT", 16, y)
   syncLabel:SetText("Sync settings (account/character scope):")
+  y = y - 24
 
-  AddButton("Account → Character", 16, buttonsY - 60, function()
+  AddButton("Account → Character", 16, y, function()
     EnsureDBs()
     ShallowCopyDefaults(AutoInstanceLogDB, AutoInstanceLogCharDB)
     PrintConfirm("|cffffff00AutoInstanceLog:|r Synced Account → Character.")
     DebouncedApply()
   end)
 
-  AddButton("Character → Account", 166, buttonsY - 60, function()
+  AddButton("Character → Account", 166, y, function()
     EnsureDBs()
     ShallowCopyDefaults(AutoInstanceLogCharDB, AutoInstanceLogDB)
     PrintConfirm("|cffffff00AutoInstanceLog:|r Synced Character → Account.")
     DebouncedApply()
   end)
+  y = y - 36
 
   AddCheck("Per-character settings (instead of account-wide)", "Settings scope selector (account vs character).", function() return AutoInstanceLogDB.perCharacter end, function(v) AutoInstanceLogDB.perCharacter = v end)
 
-  local help = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-  help:SetPoint("TOPLEFT", 16, buttonsY - 110)
+  local help = content:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+  help:SetPoint("TOPLEFT", 16, y)
   help:SetJustifyH("LEFT")
   help:SetText("Commands: /autolog help   |   Tip: /autolog debug shows instanceID & difficultyID")
+  y = y - 40
+
+  -- IMPORTANT: set the content height so the scroll range is correct
+  content:SetHeight(math.abs(y) + 80)
 
   local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
   Settings.RegisterAddOnCategory(category)
