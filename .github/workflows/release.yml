@@ -1,4 +1,4 @@
-name: Package WoW Addon (AutoInstanceLog)
+name: Build addon zip for releases
 
 on:
   push:
@@ -9,33 +9,30 @@ permissions:
   contents: write
 
 jobs:
-  package:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build addon zip with AutoInstanceLog folder
-        shell: bash
+      - name: Create distributable folder
         run: |
-          set -euo pipefail
-
-          TAG="${GITHUB_REF_NAME}"          # e.g. v2.2
-          VERSION="${TAG#v}"                # e.g. 2.2
-
+          set -e
           rm -rf dist
           mkdir -p dist/AutoInstanceLog
+          # Copy only what the addon needs
+          cp -v AutoInstanceLog.toc AutoInstanceLog.lua dist/AutoInstanceLog/
+          # If you add more files later, add them here:
+          # cp -v README.md dist/AutoInstanceLog/
+          # cp -rv Media dist/AutoInstanceLog/
 
-          # Copy the addon files into a folder named exactly AutoInstanceLog
-          cp -f AutoInstanceLog.toc AutoInstanceLog.lua dist/AutoInstanceLog/
+      - name: Create zip (folder inside zip is AutoInstanceLog/)
+        run: |
+          set -e
+          cd dist
+          zip -r ../AutoInstanceLog.zip AutoInstanceLog
 
-          # If you later add more files (e.g. locales, media), copy them here too:
-          # cp -rf Media Locales dist/AutoInstanceLog/
-
-          (cd dist && zip -r "AutoInstanceLog-${VERSION}.zip" AutoInstanceLog)
-
-      - name: Create GitHub Release + upload asset
+      - name: Upload zip to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/AutoInstanceLog-*.zip
-          generate_release_notes: true
+          files: AutoInstanceLog.zip
