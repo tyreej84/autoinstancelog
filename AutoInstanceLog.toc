@@ -2,9 +2,8 @@
 ## Title: Auto Instance Log
 ## Notes: Automatically enables combat logging in dungeons and raids.
 ## Author: Karnytine-Stormrage (joe@tyreenet.com)
-## Version: 2.1
+## Version: 3.0
 ## SavedVariables: AutoInstanceLogDB
 ## SavedVariablesPerCharacter: AutoInstanceLogCharDB
 
 AutoInstanceLog.lua
-
