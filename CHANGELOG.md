@@ -7,6 +7,19 @@ and this project follows semantic versioning.
 
 ---
 
+## [3.0.1] – 2026-03-19
+
+### Fixed
+- Updated addon interface metadata to Retail **12.0.1** (`## Interface: 120001`), resolving out-of-date client/version detection.
+- Custom UI lock now disables only move/resize behavior instead of disabling all frame interaction.
+- Unified disable behavior: toggling **Enabled** off from UI now follows the same immediate cleanup path as slash command disable.
+
+### Changed
+- Bumped addon version to **3.0.1**.
+- Updated README to better describe runtime logging ownership, instance transition handling, and install layout expectations.
+
+---
+
 ## [3.0] – 2026-01-27
 
 ### Added

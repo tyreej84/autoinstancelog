@@ -1,4 +1,4 @@
--- AutoInstanceLog.lua (v3.0)
+-- AutoInstanceLog.lua (v3.0.1)
 -- Adds:
 --  - Custom in-game config window (/autolog ui) with tabs + scrolling
 --  - DB versioning + migrations
@@ -120,6 +120,7 @@ local STATE = {
   settingsCategory = nil,
   settingsPanel = nil,
   cfgFrame = nil,
+  cfgSizer = nil,
   cfgTicker = nil,
 }
 
@@ -1072,7 +1073,17 @@ local function CreateSettingsPanel()
   AddSub("Auto-enable combat logging in dungeons/raids with Mythic+ and raid difficulty filters.")
   AddSpacer(6)
 
-  AddCheck("Enabled", "Master enable for addon behavior.", function() return DB().enabled end, function(v) DB().enabled = v end)
+  AddCheck("Enabled", "Master enable for addon behavior.", function() return DB().enabled end, function(v)
+    local db = DB()
+    db.enabled = v
+    if not v then
+      CancelRecheck()
+      CancelEnableDisableTimers()
+      if db.disableWhenLeavingLogged and STATE.addonEnabledLogging and (not STATE.manualOwnedLogging) then
+        DisableCombatLogging(db, true)
+      end
+    end
+  end)
   AddCheck("Enable for this character (participate)", "If off, this character will never be auto-logged.", function() return CDB().participate end, function(v) CDB().participate = v end)
 
   AddDropdown("Output:", { "chat", "errors" }, function() return DB().output end, function(v) DB().output = v end)
@@ -1280,12 +1291,13 @@ local function SetCfgLocked(locked)
   local frame = STATE.cfgFrame
   if not frame then return end
 
-  if db.uiLocked then
-    frame:SetMovable(false)
-    frame:EnableMouse(false)
-  else
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
+  -- Keep the frame interactive while locked; only disable move/resize.
+  frame:SetMovable(not db.uiLocked)
+  frame:EnableMouse(true)
+
+  if STATE.cfgSizer then
+    STATE.cfgSizer:EnableMouse(not db.uiLocked)
+    STATE.cfgSizer:SetAlpha(db.uiLocked and 0.35 or 1)
   end
 end
 
@@ -1386,7 +1398,16 @@ local function BuildConfigTabContent(parent, tabIndex, refreshStatusFn)
     AddSub("Quick settings for enabling/disabling and basic behavior.")
     AddSpacer(6)
 
-    AddCheck("Enabled", "Master enable for addon behavior.", function() return db.enabled end, function(v) db.enabled = v end)
+    AddCheck("Enabled", "Master enable for addon behavior.", function() return db.enabled end, function(v)
+      db.enabled = v
+      if not v then
+        CancelRecheck()
+        CancelEnableDisableTimers()
+        if db.disableWhenLeavingLogged and STATE.addonEnabledLogging and (not STATE.manualOwnedLogging) then
+          DisableCombatLogging(db, true)
+        end
+      end
+    end)
     AddCheck("Enable for this character (participate)", "If off, this character will never be auto-logged.", function() return cdb.participate end, function(v) cdb.participate = v end)
 
     AddDropdown("Logging Mode:", { "both", "raids", "dungeons" }, function() return db.mode end, function(v) db.mode = v end)
@@ -1591,12 +1612,15 @@ local function CreateOrShowConfigWindow()
     sizer:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     sizer:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
     sizer:SetScript("OnMouseDown", function()
+      if GetDB().uiLocked then return end
       frame:StartSizing("BOTTOMRIGHT")
     end)
     sizer:SetScript("OnMouseUp", function()
       frame:StopMovingOrSizing()
       SaveCfgPosition()
     end)
+
+    STATE.cfgSizer = sizer
 
     -- Status line
     local status = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")

@@ -1,8 +1,8 @@
-## Interface: 120000
+## Interface: 120001
 ## Title: Auto Instance Log
 ## Notes: Automatically enables combat logging in dungeons and raids.
 ## Author: Karnytine-Stormrage (joe@tyreenet.com)
-## Version: 3.0
+## Version: 3.0.1
 ## SavedVariables: AutoInstanceLogDB
 ## SavedVariablesPerCharacter: AutoInstanceLogCharDB
 
