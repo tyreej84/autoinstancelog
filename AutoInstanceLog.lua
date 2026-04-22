@@ -1,4 +1,4 @@
--- AutoInstanceLog.lua (v3.0.1)
+-- AutoInstanceLog.lua (v3.0.2)
 -- Adds:
 --  - Custom in-game config window (/autolog ui) with tabs + scrolling
 --  - DB versioning + migrations

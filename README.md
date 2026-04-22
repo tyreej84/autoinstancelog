@@ -2,6 +2,8 @@
 
 Auto Instance Log is a lightweight World of Warcraft addon that automatically enables Combat Logging when you enter eligible instances, then disables it when appropriate based on ownership rules and your settings. It is designed to make logging for tools like Warcraft Logs effortless, without forcing global logging behavior when you do not want it.
 
+Current release target: WoW Retail 12.0.5.
+
 ## Features
 
 - Automatically enables Combat Logging in dungeons (`party`) and raids (`raid`)
