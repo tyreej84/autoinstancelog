@@ -7,6 +7,17 @@ and this project follows semantic versioning.
 
 ---
 
+## [3.0.3] - 2026-06-17
+
+### Fixed
+- Updated addon interface metadata to Retail **12.0.7** (`## Interface: 120007`) so the addon is recognized as current for the latest patch.
+
+### Changed
+- Bumped addon version to **3.0.3**.
+- Performed a compatibility review for current addon APIs/events used by this project for 12.0.7 release readiness.
+
+---
+
 ## [3.0.2] - 2026-04-21
 
 ### Fixed
