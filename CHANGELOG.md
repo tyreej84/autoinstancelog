@@ -7,6 +7,15 @@ and this project follows semantic versioning.
 
 ---
 
+## [3.0.5] - 2026-10-12
+
+### Changed
+- Updated addon interface metadata to Retail **12.1.5** (`## Interface: 120105`).
+- Reviewed the instance, challenge-mode, combat-logging, and settings APIs used by the addon against the 12.1.5 client; no code changes were needed.
+- Bumped addon version to **3.0.5**.
+
+---
+
 ## [3.0.4] - 2026-08-10
 
 ### Changed
